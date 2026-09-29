@@ -1,0 +1,5 @@
+import 'server-only';
+import {serviceClient} from './supabase/server';
+export async function notifyOwner(id:string,message:{name:string;email:string;subject:string;message:string}){const key=process.env.RESEND_API_KEY,from=process.env.RESEND_FROM_EMAIL,to=process.env.CONTACT_TO_EMAIL;let status='not_configured',providerId:string|null=null;
+if(key&&from&&to){try{const response=await fetch('https://api.resend.com/emails',{method:'POST',headers:{Authorization:'Bearer '+key,'Content-Type':'application/json','Idempotency-Key':'portfolio-contact/'+id},body:JSON.stringify({from,to:[to],reply_to:message.email,subject:'Portfolio enquiry: '+message.subject.replace(/[\r\n]/g,' '),text:`From: ${message.name} <${message.email}>\n\n${message.message}\n\nMessage ID: ${id}`}),signal:AbortSignal.timeout(8000)});const body=await response.json() as {id?:string};status=response.ok?'sent':'failed';providerId=body.id||null}catch{status='failed'}}
+const {error}=await serviceClient().from('portfolio_messages').update({email_status:status,email_provider_id:providerId}).eq('id',id);if(error)console.error('Notification status update failed');return status;}

@@ -1,0 +1,4 @@
+// Development helper. Regenerate initial seed after editing lib/content.ts.
+const fs=require('node:fs'),ts=require('typescript');const mod={exports:{}};new Function('exports','module',ts.transpile(fs.readFileSync('lib/content.ts','utf8'),{module:ts.ModuleKind.CommonJS}))(mod.exports,mod);
+const q=v=>"'"+JSON.stringify(v).replaceAll("'","''")+"'::jsonb";
+const {initialProfile,initialProjects}=mod.exports;const sql=["-- Run after 001_portfolio.sql. Existing rows are preserved.","insert into public.portfolio_settings(key,value) values ('profile',"+q(initialProfile)+") on conflict(key) do nothing;",...initialProjects.map(p=>"insert into public.portfolio_projects(id,data,published,position) values ('"+p.id.replaceAll("'","''")+"',"+q(p)+","+p.published+","+p.position+") on conflict(id) do nothing;")];fs.writeFileSync('supabase/002_seed.sql',sql.join('\n')+'\n');
