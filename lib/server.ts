@@ -1,0 +1,11 @@
+import 'server-only';
+import {publicClient,userClient,serviceClient} from './supabase/server';
+import {initialProfile,type Profile,type Project} from './content';
+export async function adminClient(){const client=await userClient();const {data:{user},error}=await client.auth.getUser();if(error||!user)return null;const {data,error:roleError}=await client.from('portfolio_admins').select('user_id').eq('user_id',user.id).maybeSingle();return !roleError&&data?client:null;}
+export async function isAdmin(){try{return !!await adminClient()}catch{return false}}
+export function sameOrigin(req:Request){const origin=req.headers.get('origin');const allowed=process.env.SITE_URL?new URL(process.env.SITE_URL).origin:new URL(req.url).origin;return !!origin&&origin===allowed;}
+export async function setting<T>(key:string,fallback:T):Promise<T>{const {data,error}=await publicClient().from('portfolio_settings').select('value').eq('key',key).maybeSingle();if(error)throw error;return data?data.value as T:fallback;}
+export async function content(admin=false){const client=admin?await adminClient():publicClient();if(!client)throw new Error('Not authorized');const [{data:profile,error:pe},{data:rows,error:re}]=await Promise.all([client.from('portfolio_settings').select('value').eq('key','profile').maybeSingle(),client.from('portfolio_projects').select('id,data,published,position').order('position')]);if(pe||re)throw pe||re;return {profile:(profile?.value||initialProfile) as Profile,projects:(rows||[]).map(r=>({...r.data,id:r.id,published:r.published,position:r.position}) as Project).filter(p=>admin||p.published)};}
+export function fail(message:string,status=400){return Response.json({error:message},{status});}
+export async function readBody(req:Request,maxBytes:number){const reader=req.body?.getReader();if(!reader)return '';let size=0;const chunks:Uint8Array[]=[];while(true){const {value,done}=await reader.read();if(done)break;size+=value.byteLength;if(size>maxBytes){await reader.cancel();throw new Error('BODY_TOO_LARGE')}chunks.push(value)}const bytes=new Uint8Array(size);let offset=0;for(const chunk of chunks){bytes.set(chunk,offset);offset+=chunk.length}return new TextDecoder().decode(bytes)}
+export {publicClient,serviceClient};
